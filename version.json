@@ -1,5 +1,5 @@
 {
-  "version": "1.4",
-  "url": "https://raw.githubusercontent.com/sbhan3967-png/omunim-live-rate-updates/main/OMUNIM-Live-Rate-Extension-v1.4.zip",
-  "notes": "v1.4: board aur item rate ab MCX + premium wala dikhta hai; fallback ghadi/warning fix."
+  "version": "1.5",
+  "url": "https://raw.githubusercontent.com/sbhan3967-png/omunim-live-rate-updates/main/OMUNIM-Live-Rate-Extension-v1.5.zip",
+  "notes": "v1.5: Quotation button ab MCX+premium wala ESTIMATE kholta hai (OMUNIM net-weight hisaab, same design)."
 }
