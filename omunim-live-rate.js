@@ -1,5 +1,6 @@
 /* OMUNIM Live MCX Rate Calculator — BOOKMARKLET build (no extension).
-   Version: 1.6-web (2026-11-28) — same maths as extension v1.6, including
+   Version: 1.7-web (2026-11-28) — same maths as extension v1.7, including
+   the stone-table fix (GR1's CS 73,935 was missing) and
    the purity-rate Quotation fix: metalRate = (MCX + premium) x item purity
    (76% item quotes at the 18K rate, 60% / 14K item at the 14K rate).
    Works on any laptop / any browser with just internet: save it as a
@@ -34,6 +35,9 @@
      (i.e. Rs 1,29,200/10 g at stock-entry time). Net 4.512 g x Final
      Purity 60% = 2.7072 g. Making 1,200 x 2.7072 = 3,248.64.
    - GST = 3% of Total Amount. dia Amt 43,600 = stone-table AMT.
+   - v1.7: stone amount comes from the stone TABLE (SR.NO./DETAILS/
+     COLOR/CLARITY/QTY/GS WT/AMT) when one exists — GR1's CS 73,935
+     has no "dia Amt" label. Table wins, label is the fallback.
    - Top bar itself shows "MCX Gold:121949" / "MCX Silver:148900".
 
    MCX SOURCE: https://mcxlive.org/gold/ and /silver/ — the live quote
@@ -129,6 +133,37 @@ function _labelNum(text, labelPattern) {
   return m ? parseNum(m[1]) : null;
 }
 
+/* ---- Stone table parsing (v1.7) ----
+   Items whose stone is a TABLE row, not a "dia Amt" label (GR1, 28 Nov
+   2026: CS 7.950 CT, AMT 73,935 — the old parser read diaAmt = 0 and
+   the panel showed 174,712.72 instead of 250,865.77). In innerText the
+   table is TAB-separated cells:
+     SR.NO.\tDETAILS\tCOLOR\tCLARITY\tQTY\tGS WT\tAMT
+     1\tCS\t-\t-\t1\t7.950 CT\t73935
+   (the Node test text uses spaces — both separators are handled).
+   Rule: if a stone table exists, its AMT sum IS the stone amount
+   (the "dia Amt" label, if any, is the SAME amount — DLR16 has both,
+   table 43,600 = label 43,600 — so taking the table never
+   double-counts). If no table exists, fall back to the label. */
+function parseStoneTable(text) {
+  if (!text) return null;
+  var lines = String(text).split("\n");
+  var total = 0, rows = 0, inTable = false;
+  for (var i = 0; i < lines.length; i++) {
+    var raw = lines[i];
+    var norm = raw.replace(/\t/g, " ").replace(/\s+/g, " ").trim();
+    if (/^SR\.?\s*NO\.?/i.test(norm) && /\bAMT\b/i.test(norm)) { inTable = true; continue; }
+    if (!inTable || !norm) continue;
+    var cells = raw.split("\t").map(function (c) { return c.trim(); }).filter(function (c) { return c !== ""; });
+    if (cells.length < 2) cells = norm.split(" ");
+    if (cells.length < 2 || !/^\d+$/.test(cells[0])) { inTable = false; continue; }
+    var amt = parseNum(cells[cells.length - 1]);
+    if (amt === null) continue; // row without an amount: skip, keep table open
+    total += amt; rows++;
+  }
+  return rows ? total : null;
+}
+
 function parsePanelText(text) {
   if (!text) return null;
   // Normalise: non-breaking spaces, "Rs." artefacts, tabs.
@@ -163,6 +198,11 @@ function parsePanelText(text) {
 
   p.metalAmtOld = _labelNum(t, "Metal Amount");
   p.diaAmt = _labelNum(t, "dia Amt");
+  // v1.7: stone table (CS/DIA/...) wins over the "dia Amt" label when it
+  // exists (same amount on items that have both — never double-counted);
+  // items like GR1 have ONLY the table, so without this the stone was 0.
+  p.stoneTableAmt = parseStoneTable(t);
+  if (p.stoneTableAmt !== null) p.diaAmt = p.stoneTableAmt;
   m = t.match(/Making Charges\s*(?:\(([^)]*)\))?\s*:\s*([\d,]+\.\d{2})/i);
   p.makingAmtOld = m ? parseNum(m[2]) : null;
   p.makingBracket = m && m[1] ? m[1].trim() : null;
